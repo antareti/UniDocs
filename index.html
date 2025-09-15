@@ -1,62 +1,212 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Генератор изображений</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-body { font-family: sans-serif; background: #0c101a; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; }
-.container { width: 400px; }
-textarea { width: 100%; padding: 10px; border-radius: 5px; margin-bottom: 10px; background: #222; color: #fff; border: none; resize: none; }
-button { width: 100%; padding: 10px; border-radius: 5px; background: #6366f1; color: #fff; font-weight: bold; cursor: pointer; }
-img { width: 100%; margin-top: 10px; border-radius: 5px; display: none; }
-.spinner { border: 4px solid rgba(255,255,255,0.2); border-top: 4px solid #fff; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: auto; display: none; }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Интерактивная Солнечная система</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            flex-direction: column;
+        }
+
+        canvas {
+            display: block;
+            border-radius: 1rem;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .title {
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 20px;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        .instructions {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 1rem;
+            color: #ccc;
+        }
+    </style>
+    <!-- Используем модульный подход для загрузки библиотек -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
+                "three/examples/jsm/controls/OrbitControls.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/controls/OrbitControls.js"
+            }
+        }
+    </script>
 </head>
 <body>
-<div class="container">
-    <textarea id="prompt" rows="3" placeholder="Например: футуристический город, неон, 4K"></textarea>
-    <button id="generateBtn">Сгенерировать</button>
-    <div class="spinner" id="spinner"></div>
-    <img id="result" alt="Сгенерированное изображение">
-</div>
+    <div class="title">Виртуальная Солнечная система</div>
+    <div class="instructions">
+        Используйте левую кнопку мыши, чтобы вращать, и колесо мыши для масштабирования.
+    </div>
 
-<script>
-const btn = document.getElementById('generateBtn');
-const promptInput = document.getElementById('prompt');
-const resultImg = document.getElementById('result');
-const spinner = document.getElementById('spinner');
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-btn.addEventListener('click', async () => {
-    const prompt = promptInput.value.trim();
-    if (!prompt) return alert('Введите запрос!');
-
-    spinner.style.display = 'block';
-    resultImg.style.display = 'none';
-
-    try {
-        const response = await fetch('https://api.craiyon.com/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: prompt })
-        });
-        const data = await response.json();
-
-        if (data && data.images && data.images.length > 0) {
-            // Показываем первое изображение
-            resultImg.src = "data:image/png;base64," + data.images[0];
-            resultImg.style.display = 'block';
-        } else {
-            alert('Не удалось сгенерировать изображение.');
+        // Инициализация сцены, камеры и рендера
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        
+        renderer.setClearColor(0x000000, 1);
+        
+        function onResize() {
+            const width = window.innerWidth * 0.8;
+            const height = window.innerHeight * 0.8;
+            renderer.setSize(width, height);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
         }
-    } catch(e) {
-        alert('Ошибка: ' + e.message);
-    } finally {
-        spinner.style.display = 'none';
-    }
-});
-</script>
+        
+        window.addEventListener('resize', onResize);
+        onResize();
+
+        document.body.appendChild(renderer.domElement);
+        
+        // Создаем функцию для генерации планет
+        function createPlanet(size, color, distance, orbitSpeed) {
+            const geometry = new THREE.SphereGeometry(size, 32, 32);
+            const material = new THREE.MeshStandardMaterial({ color: color });
+            const planet = new THREE.Mesh(geometry, material);
+            
+            // Создаем невидимый объект для орбиты
+            const pivot = new THREE.Object3D();
+            pivot.add(planet);
+            planet.position.x = distance;
+            
+            return { planet, pivot, orbitSpeed };
+        }
+
+        // Создаем группу для всей солнечной системы
+        const solarSystem = new THREE.Group();
+        scene.add(solarSystem);
+
+        // Создаем Солнце
+        const sunGeometry = new THREE.SphereGeometry(2.5, 64, 64);
+        const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+        const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+        solarSystem.add(sun);
+        
+        // Добавляем свет от Солнца
+        const sunLight = new THREE.PointLight(0xffffff, 1.5, 100);
+        sun.add(sunLight);
+
+        // Создаем Землю и Луну
+        const earth = createPlanet(0.8, 0x00ff00, 6, 0.005);
+        solarSystem.add(earth.pivot);
+        
+        const moonPivot = new THREE.Object3D();
+        earth.planet.add(moonPivot);
+        
+        const moonGeometry = new THREE.SphereGeometry(0.2, 32, 32);
+        const moonMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc });
+        const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+        moon.position.x = 1.5;
+        moonPivot.add(moon);
+        
+        // Добавляем другие планеты
+        const mercury = createPlanet(0.3, 0x888888, 3, 0.02);
+        solarSystem.add(mercury.pivot);
+
+        const venus = createPlanet(0.7, 0xff8800, 4.5, 0.012);
+        solarSystem.add(venus.pivot);
+
+        const mars = createPlanet(0.5, 0xff0000, 8, 0.003);
+        solarSystem.add(mars.pivot);
+
+        // Новые планеты: Юпитер, Сатурн, Уран, Нептун
+        const jupiter = createPlanet(1.5, 0xffa500, 10, 0.002);
+        solarSystem.add(jupiter.pivot);
+
+        const saturn = createPlanet(1.2, 0xd2b48c, 12, 0.0015);
+        solarSystem.add(saturn.pivot);
+
+        // Кольца Сатурна
+        const ringsGeometry = new THREE.TorusGeometry(2, 0.2, 2, 100);
+        const ringsMaterial = new THREE.MeshBasicMaterial({ color: 0x888888, side: THREE.DoubleSide });
+        const rings = new THREE.Mesh(ringsGeometry, ringsMaterial);
+        rings.rotation.x = Math.PI / 2;
+        saturn.planet.add(rings);
+
+        const uranus = createPlanet(1.0, 0xadd8e6, 14, 0.0009);
+        solarSystem.add(uranus.pivot);
+
+        const neptune = createPlanet(1.0, 0x4169e1, 16, 0.0007);
+        solarSystem.add(neptune.pivot);
+
+        // Создаем звездный фон
+        const starsGeometry = new THREE.BufferGeometry();
+        const starsVertices = [];
+        for (let i = 0; i < 10000; i++) {
+            const x = (Math.random() - 0.5) * 2000;
+            const y = (Math.random() - 0.5) * 2000;
+            const z = (Math.random() - 0.5) * 2000;
+            starsVertices.push(x, y, z);
+        }
+        starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starsVertices, 3));
+        const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 2 });
+        const starfield = new THREE.Points(starsGeometry, starsMaterial);
+        scene.add(starfield);
+
+        // Добавляем управление
+        const controls = new OrbitControls(camera, renderer.domElement);
+        camera.position.z = 30;
+        controls.minDistance = 5;
+        controls.maxDistance = 50;
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Анимационный цикл
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Вращение планет по орбите вокруг Солнца
+            mercury.pivot.rotation.y += mercury.orbitSpeed;
+            venus.pivot.rotation.y += venus.orbitSpeed;
+            earth.pivot.rotation.y += earth.orbitSpeed;
+            mars.pivot.rotation.y += mars.orbitSpeed;
+            jupiter.pivot.rotation.y += jupiter.orbitSpeed;
+            saturn.pivot.rotation.y += saturn.orbitSpeed;
+            uranus.pivot.rotation.y += uranus.orbitSpeed;
+            neptune.pivot.rotation.y += neptune.orbitSpeed;
+            
+            // Вращение Луны вокруг Земли
+            moonPivot.rotation.y += 0.02;
+
+            // Вращение планет вокруг своей оси
+            sun.rotation.y += 0.001;
+            mercury.planet.rotation.y += 0.01;
+            venus.planet.rotation.y += 0.005;
+            earth.planet.rotation.y += 0.01;
+            moon.rotation.y += 0.01;
+            mars.planet.rotation.y += 0.01;
+            jupiter.planet.rotation.y += 0.005;
+            saturn.planet.rotation.y += 0.005;
+            uranus.planet.rotation.y += 0.005;
+            neptune.planet.rotation.y += 0.005;
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
 </body>
 </html>
