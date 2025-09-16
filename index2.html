@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Интерактивная Солнечная система</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a1a1a; /* Background color for the cockpit */
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            flex-direction: column;
+            cursor: move;
+        }
+
+        /* Container for the porthole effect */
+        .porthole-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2; /* Ensure porthole is on top of the cockpit panels */
+        }
+
+        canvas {
+            display: block;
+            border-radius: 50%;
+            width: 80vh;
+            height: 80vh;
+            max-width: 90vw;
+            max-height: 90vw;
+            position: relative;
+            z-index: 1;
+            transition: all 0.3s ease;
+        }
+
+        .porthole-frame {
+            position: absolute;
+            width: 80vh;
+            height: 80vh;
+            max-width: 90vw;
+            max-height: 90vw;
+            border-radius: 50%;
+            box-shadow: 
+                inset 0 0 50px rgba(255, 255, 255, 0.1),
+                0 0 30px rgba(0, 0, 0, 0.5),
+                inset 0 0 10px rgba(0, 0, 0, 0.8);
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.05) 0%, rgba(0, 0, 0, 0.3) 100%);
+            border: 10px solid;
+            border-color: #777 #bbb #bbb #777;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .porthole-frame::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 95%;
+            height: 95%;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 
+                inset 0 0 10px rgba(0, 0, 0, 0.5),
+                0 0 5px rgba(255, 255, 255, 0.2);
+            border: 2px solid #555;
+        }
+
+        .porthole-struts {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        .porthole-struts::before,
+        .porthole-struts::after {
+            content: '';
+            position: absolute;
+            background: #444;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+        }
+
+        .porthole-struts::before {
+            width: 100%;
+            height: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .porthole-struts::after {
+            width: 5px;
+            height: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .porthole-glare {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            border-radius: 50%;
+            background: radial-gradient(circle at var(--x) var(--y), rgba(255, 255, 255, 0.2) 0%, transparent 50%);
+            pointer-events: none;
+            transition: background 0.1s ease-out;
+        }
+
+        /* New, more realistic cockpit walls and details */
+        .cockpit-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1; /* Make sure this is behind the porthole-container */
+            background-color: transparent; /* This was the main issue. Changed to transparent. */
+        }
+
+        .cockpit-wall-left, .cockpit-wall-right {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            width: 25%;
+            background-color: #2b2b2b;
+            box-shadow: inset -5px 0 10px rgba(0,0,0,0.5);
+            border-right: 1px solid #444;
+            border-left: 1px solid #444;
+        }
+        
+        .cockpit-wall-left {
+            left: 0;
+        }
+
+        .cockpit-wall-right {
+            right: 0;
+        }
+
+        .cockpit-console {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 25%;
+            background-color: #2b2b2b;
+            box-shadow: inset 0 5px 10px rgba(0,0,0,0.5);
+            border-top: 1px solid #444;
+            pointer-events: none;
+        }
+        
+        .panel {
+            position: absolute;
+            background-color: #383838;
+            border: 1px solid #555;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+            border-radius: 5px;
+            pointer-events: none;
+        }
+
+        .cockpit-wall-left .panel-1 { top: 15%; left: 10%; width: 80%; height: 25%; }
+        .cockpit-wall-left .panel-2 { top: 45%; left: 10%; width: 80%; height: 10%; }
+        .cockpit-wall-left .panel-3 { top: 60%; left: 10%; width: 80%; height: 20%; }
+        
+        .cockpit-wall-right .panel-1 { top: 15%; right: 10%; width: 80%; height: 25%; }
+        .cockpit-wall-right .panel-2 { top: 45%; right: 10%; width: 80%; height: 10%; }
+        .cockpit-wall-right .panel-3 { top: 60%; right: 10%; width: 80%; height: 20%; }
+        
+        .cockpit-light {
+            position: absolute;
+            background-color: #0ff;
+            box-shadow: 0 0 10px #0ff;
+            border-radius: 50%;
+        }
+
+        .cockpit-light-1 { top: 5%; left: 10%; width: 10px; height: 10px; }
+        .cockpit-light-2 { top: 5%; right: 10%; width: 10px; height: 10px; }
+
+        .cockpit-light-3 { top: 5%; left: 30%; width: 8px; height: 8px; background-color: #f00; box-shadow: 0 0 8px #f00; }
+        .cockpit-light-4 { top: 5%; right: 30%; width: 8px; height: 8px; background-color: #f00; box-shadow: 0 0 8px #f00; }
+        
+        .title {
+            position: absolute;
+            top: 20px;
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-align: center;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            z-index: 4;
+        }
+
+        .instructions {
+            position: absolute;
+            bottom: 20px;
+            text-align: center;
+            font-size: 1rem;
+            color: #ccc;
+            z-index: 4;
+        }
+    </style>
+    <!-- Use a modular approach for loading libraries -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
+                "three/examples/jsm/controls/OrbitControls.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/controls/OrbitControls.js"
+            }
+        }
+    </script>
+</head>
+<body>
+    <!-- The cockpit overlay should be a sibling of the porthole container -->
+    <div class="cockpit-overlay">
+        <div class="cockpit-wall-left">
+            <div class="panel panel-1"></div>
+            <div class="panel panel-2"></div>
+            <div class="panel panel-3"></div>
+        </div>
+        <div class="cockpit-wall-right">
+            <div class="panel panel-1"></div>
+            <div class="panel panel-2"></div>
+            <div class="panel panel-3"></div>
+        </div>
+        <div class="cockpit-console"></div>
+        <div class="cockpit-light cockpit-light-1"></div>
+        <div class="cockpit-light cockpit-light-2"></div>
+        <div class="cockpit-light cockpit-light-3"></div>
+        <div class="cockpit-light cockpit-light-4"></div>
+    </div>
+    
+    <div class="porthole-container">
+        <div class="porthole-frame">
+            <div class="porthole-glare"></div>
+            <div class="porthole-struts"></div>
+        </div>
+        <canvas id="solar-system"></canvas>
+    </div>
+    
+    <div class="title">космическая станция мир 2025</div>
+    <div class="instructions">
+        Используйте левую кнопку мыши, чтобы вращать, и колесо мыши для масштабирования.
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+
+        // Initialize scene, camera, and renderer
+        const canvas = document.getElementById('solar-system');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, canvas.offsetWidth / canvas.offsetHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: canvas });
+        
+        renderer.setClearColor(0x000000, 1);
+        
+        function onResize() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            
+            // Update canvas size for responsiveness
+            const canvasSize = Math.min(width, height) * 0.8;
+            canvas.style.width = `${canvasSize}px`;
+            canvas.style.height = `${canvasSize}px`;
+
+            renderer.setSize(canvas.offsetWidth, canvas.offsetHeight);
+            camera.aspect = canvas.offsetWidth / canvas.offsetHeight;
+            camera.updateProjectionMatrix();
+        }
+        
+        window.addEventListener('resize', onResize);
+        onResize();
+
+        // Update glare position on mouse move
+        const glareElement = document.querySelector('.porthole-glare');
+        window.addEventListener('mousemove', (e) => {
+            const rect = glareElement.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width * 100;
+            const y = (e.clientY - rect.top) / rect.height * 100;
+            glareElement.style.setProperty('--x', `${x}%`);
+            glareElement.style.setProperty('--y', `${y}%`);
+        });
+
+        // Function to create planets
+        function createPlanet(size, color, distance, orbitSpeed) {
+            const geometry = new THREE.SphereGeometry(size, 32, 32);
+            const material = new THREE.MeshStandardMaterial({ color: color });
+            const planet = new THREE.Mesh(geometry, material);
+            
+            // Create an invisible object for the orbit
+            const pivot = new THREE.Object3D();
+            pivot.add(planet);
+            planet.position.x = distance;
+            
+            return { planet, pivot, orbitSpeed };
+        }
+
+        // Load textures for Earth
+        const textureLoader = new THREE.TextureLoader();
+        const earthTexture = textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_atmos_2048.jpg');
+        const earthBumpMap = textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_bump_2048.jpg');
+
+        // Create a group for the entire solar system
+        const solarSystem = new THREE.Group();
+        scene.add(solarSystem);
+
+        // Create the Sun
+        const sunGeometry = new THREE.SphereGeometry(2.5, 64, 64);
+        const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+        const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+        solarSystem.add(sun);
+        
+        // Add light from the Sun
+        const sunLight = new THREE.PointLight(0xffffff, 1.5, 100);
+        sun.add(sunLight);
+
+        // Create Earth and the Moon
+        // Use MeshPhongMaterial to support textures
+        const earthGeometry = new THREE.SphereGeometry(0.8, 32, 32);
+        const earthMaterial = new THREE.MeshPhongMaterial({
+            map: earthTexture,
+            bumpMap: earthBumpMap,
+            bumpScale: 0.05
+        });
+        const earthPlanet = new THREE.Mesh(earthGeometry, earthMaterial);
+
+        const earth = {
+            planet: earthPlanet,
+            pivot: new THREE.Object3D(),
+            orbitSpeed: 0.005
+        };
+        earth.pivot.add(earth.planet);
+        earth.planet.position.x = 6;
+        solarSystem.add(earth.pivot);
+        
+        const moonPivot = new THREE.Object3D();
+        earth.planet.add(moonPivot);
+        
+        const moonGeometry = new THREE.SphereGeometry(0.2, 32, 32);
+        const moonMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc });
+        const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+        moon.position.x = 1.5;
+        moonPivot.add(moon);
+        
+        // Add other planets
+        const mercury = createPlanet(0.3, 0x888888, 3, 0.02);
+        solarSystem.add(mercury.pivot);
+
+        const venus = createPlanet(0.7, 0xff8800, 4.5, 0.012);
+        solarSystem.add(venus.pivot);
+
+        const mars = createPlanet(0.5, 0xff0000, 8, 0.003);
+        solarSystem.add(mars.pivot);
+
+        // New planets: Jupiter, Saturn, Uranus, Neptune
+        const jupiter = createPlanet(1.5, 0xffa500, 10, 0.002);
+        solarSystem.add(jupiter.pivot);
+
+        const saturn = createPlanet(1.2, 0xd2b48c, 12, 0.0015);
+        solarSystem.add(saturn.pivot);
+
+        // Saturn's rings
+        const ringsGeometry = new THREE.TorusGeometry(2, 0.2, 2, 100);
+        const ringsMaterial = new THREE.MeshBasicMaterial({ color: 0x888888, side: THREE.DoubleSide });
+        const rings = new THREE.Mesh(ringsGeometry, ringsMaterial);
+        rings.rotation.x = Math.PI / 2;
+        saturn.planet.add(rings);
+
+        const uranus = createPlanet(1.0, 0xadd8e6, 14, 0.0009);
+        solarSystem.add(uranus.pivot);
+
+        const neptune = createPlanet(1.0, 0x4169e1, 16, 0.0007);
+        solarSystem.add(neptune.pivot);
+
+        // Create starfield background
+        const starsGeometry = new THREE.BufferGeometry();
+        const starsVertices = [];
+        for (let i = 0; i < 10000; i++) {
+            const x = (Math.random() - 0.5) * 2000;
+            const y = (Math.random() - 0.5) * 2000;
+            const z = (Math.random() - 0.5) * 2000;
+            starsVertices.push(x, y, z);
+        }
+        starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starsVertices, 3));
+        const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 2 });
+        const starfield = new THREE.Points(starsGeometry, starsMaterial);
+        scene.add(starfield);
+
+        // Add controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        camera.position.set(0, 5, 20); // Initial camera position
+        controls.target.copy(earth.planet.position); // Focus camera on Earth
+        controls.minDistance = 5;
+        controls.maxDistance = 50;
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Orbit planets around the Sun
+            mercury.pivot.rotation.y += mercury.orbitSpeed;
+            venus.pivot.rotation.y += venus.orbitSpeed;
+            earth.pivot.rotation.y += earth.orbitSpeed;
+            mars.pivot.rotation.y += mars.orbitSpeed;
+            jupiter.pivot.rotation.y += jupiter.orbitSpeed;
+            saturn.pivot.rotation.y += saturn.orbitSpeed;
+            uranus.pivot.rotation.y += uranus.orbitSpeed;
+            neptune.pivot.rotation.y += neptune.orbitSpeed;
+            
+            // Moon's rotation around Earth
+            moonPivot.rotation.y += 0.02;
+
+            // Planet's rotation on their own axis
+            sun.rotation.y += 0.001;
+            mercury.planet.rotation.y += 0.01;
+            venus.planet.rotation.y += 0.005;
+            earth.planet.rotation.y += 0.01;
+            moon.rotation.y += 0.01;
+            mars.planet.rotation.y += 0.01;
+            jupiter.planet.rotation.y += 0.005;
+            saturn.planet.rotation.y += 0.005;
+            uranus.planet.rotation.y += 0.005;
+            neptune.planet.rotation.y += 0.005;
+
+            // Update controls target to follow Earth
+            controls.target.copy(earth.planet.position);
+            controls.update();
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
+
+
