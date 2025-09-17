@@ -102,12 +102,81 @@
             const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 1.5, sizeAttenuation: true });
             const starField = new THREE.Points(starsGeometry, starsMaterial);
             scene.add(starField);
+            
+            // Function to create a canvas texture for the planet
+            function createPlanetTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 1024;
+                canvas.height = 512;
+                const context = canvas.getContext('2d');
+                
+                // Draw the red background of the planet
+                context.fillStyle = '#ff0000';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw the "СССР" text in golden color
+                context.fillStyle = '#ffd700';
+                context.font = 'bold 200px Arial';
+                context.textAlign = 'center';
+                context.textBaseline = 'middle';
+                context.fillText('СССР', canvas.width / 2, canvas.height / 2);
+                
+                return new THREE.CanvasTexture(canvas);
+            }
 
             // Planet
             const planetGeometry = new THREE.SphereGeometry(15, 64, 64);
-            const planetMaterial = new THREE.MeshLambertMaterial({ color: 0x3b82f6 });
+            const planetTexture = createPlanetTexture();
+            const planetMaterial = new THREE.MeshLambertMaterial({ map: planetTexture });
             const planet = new THREE.Mesh(planetGeometry, planetMaterial);
             scene.add(planet);
+            
+            // Создаем космический корабль (Простой дизайн, похожий на советские ракеты)
+            const spaceship = new THREE.Group();
+            
+            // Тело ракеты
+            const bodyGeometry = new THREE.CylinderGeometry(1, 1.5, 5, 32);
+            const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0xcccccc });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.rotation.x = Math.PI / 2;
+            spaceship.add(body);
+
+            // Носовой обтекатель
+            const noseGeometry = new THREE.ConeGeometry(1.5, 2, 32);
+            const noseMaterial = new THREE.MeshPhongMaterial({ color: 0xff4444 });
+            const nose = new THREE.Mesh(noseGeometry, noseMaterial);
+            nose.position.z = -3.5;
+            nose.rotation.x = Math.PI / 2;
+            spaceship.add(nose);
+
+            // Стабилизаторы (крылья)
+            const finShape = new THREE.Shape();
+            finShape.moveTo(0, 0);
+            finShape.lineTo(0, 2);
+            finShape.lineTo(0.5, 2);
+            finShape.lineTo(0.5, 0);
+            const finGeometry = new THREE.ExtrudeGeometry(finShape, {
+                steps: 1,
+                depth: 0.2,
+                bevelEnabled: false
+            });
+            const finMaterial = new THREE.MeshPhongMaterial({ color: 0x888888 });
+
+            const fin1 = new THREE.Mesh(finGeometry, finMaterial);
+            fin1.position.x = 1.5;
+            fin1.rotation.y = Math.PI / 2;
+            fin1.position.z = 1.5;
+            spaceship.add(fin1);
+
+            const fin2 = new THREE.Mesh(finGeometry, finMaterial);
+            fin2.position.x = -1.5;
+            fin2.rotation.y = Math.PI / 2;
+            fin2.position.z = 1.5;
+            spaceship.add(fin2);
+            
+            // Располагаем корабль и добавляем его на сцену
+            spaceship.scale.set(2, 2, 2);
+            scene.add(spaceship);
 
             // Light
             const ambientLight = new THREE.AmbientLight(0x404040, 2);
@@ -122,6 +191,14 @@
                 requestAnimationFrame(animate);
                 planet.rotation.y += 0.005;
                 starField.rotation.y += 0.0005;
+
+                // Заставляем корабль вращаться вокруг планеты
+                const time = Date.now() * 0.0005;
+                const radius = 25;
+                spaceship.position.x = Math.cos(time) * radius;
+                spaceship.position.z = Math.sin(time) * radius;
+                spaceship.lookAt(planet.position);
+
                 renderer.render(scene, camera);
             };
 
@@ -145,7 +222,7 @@
             // Create a simple low-frequency drone for ambient sound
             const drone = new Tone.Loop(time => {
                 const notes = ["C2", "G2", "C3"];
-                synth.triggerAttackRelease(notes, "4n", time);
+                synth.triggerAttackRelease(notes, "4s", time);
             }, "4s").start(0);
 
             let isPlaying = false;
